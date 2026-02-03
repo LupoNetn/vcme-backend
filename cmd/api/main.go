@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/luponetn/vcme/internal/auth"
+	call "github.com/luponetn/vcme/internal/calls"
 	"github.com/luponetn/vcme/internal/config"
 	"github.com/luponetn/vcme/internal/db"
 )
@@ -71,9 +72,14 @@ func main() {
 	authsvc := auth.NewSvc(queries)
 	authHandler := auth.NewHandler(authsvc, app.config)
 
+	callsvc := call.NewSvc(queries)
+	callHandler := call.NewHandler(callsvc)
+
 	router := gin.Default()
 
+	//registering the routes
 	auth.RegisterAuthRoutes(router, authHandler)
+	call.RegisterCallRoutes(router, callHandler, cfg)
 
 	server := &http.Server{
 		Addr:         ":" + app.config.Port,

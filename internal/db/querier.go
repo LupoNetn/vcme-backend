@@ -11,11 +11,15 @@ import (
 )
 
 type Querier interface {
+	CreateCallLink(ctx context.Context, arg CreateCallLinkParams) (Call, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteUser(ctx context.Context, id uuid.UUID) error
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserById(ctx context.Context, id uuid.UUID) (User, error)
+	ListAllCalls(ctx context.Context) ([]Call, error)
+	ListAllCallsByID(ctx context.Context, id uuid.UUID) ([]Call, error)
 	ListUsers(ctx context.Context) ([]User, error)
+	UpdateCall(ctx context.Context, id uuid.UUID) (Call, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 }
 

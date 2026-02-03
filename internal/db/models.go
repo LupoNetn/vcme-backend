@@ -10,12 +10,15 @@ import (
 )
 
 type Call struct {
-	ID        uuid.UUID          `json:"id"`
-	HostID    uuid.UUID          `json:"host_id"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	StartedAt pgtype.Timestamptz `json:"started_at"`
-	EndedAt   pgtype.Timestamptz `json:"ended_at"`
-	Status    string             `json:"status"`
+	ID          uuid.UUID          `json:"id"`
+	Title       string             `json:"title"`
+	Description pgtype.Text        `json:"description"`
+	CallLink    string             `json:"call_link"`
+	HostID      uuid.UUID          `json:"host_id"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	StartedAt   pgtype.Timestamptz `json:"started_at"`
+	EndedAt     pgtype.Timestamptz `json:"ended_at"`
+	Status      string             `json:"status"`
 }
 
 type CallLog struct {
