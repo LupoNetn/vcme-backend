@@ -8,7 +8,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/luponetn/vcme/internal/auth"
 	"github.com/luponetn/vcme/internal/config"
+	"github.com/luponetn/vcme/internal/db"
 )
 
 type app struct {
@@ -63,7 +65,15 @@ func main() {
 		db:     dbConn,
 	}
 
+	queries := db.New(app.db)
+
+	//setting up the services
+	authsvc := auth.NewSvc(queries)
+	authHandler := auth.NewHandler(authsvc, app.config)
+
 	router := gin.Default()
+
+	auth.RegisterAuthRoutes(router, authHandler)
 
 	server := &http.Server{
 		Addr:         ":" + app.config.Port,

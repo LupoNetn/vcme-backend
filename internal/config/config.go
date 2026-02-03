@@ -8,8 +8,10 @@ import (
 )
 
 type Config struct {
-	DatabaseURL string
-	Port        string
+	DatabaseURL      string
+	Port             string
+	JWTAccessSecret  string
+	JWTRefreshSecret string
 }
 
 // LoadConfig initializes the configuration.
@@ -25,9 +27,21 @@ func LoadConfig() (*Config, error) {
 
 	port := getEnvWithDefault("PORT", "8080")
 
+	jwtAccessSecret, err := getRequiredEnv("JWT_ACCESS_SECRET")
+	if err != nil {
+		return nil, err
+	}
+
+	jwtRefreshSecret, err := getRequiredEnv("JWT_REFRESH_SECRET")
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
-		DatabaseURL: dbURL,
-		Port:        port,
+		DatabaseURL:      dbURL,
+		Port:             port,
+		JWTAccessSecret:  jwtAccessSecret,
+		JWTRefreshSecret: jwtRefreshSecret,
 	}, nil
 }
 
