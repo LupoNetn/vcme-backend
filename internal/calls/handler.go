@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/luponetn/vcme/internal/db"
+	"github.com/luponetn/vcme/internal/util"
 )
 
 type Handler struct {
@@ -25,10 +26,12 @@ func (h *Handler) CreateCallLink(c *gin.Context) {
 		return
 	}
 
+	link := util.GenerateCallLink(call.Title, "vcme")
+
 	params := db.CreateCallLinkParams{
 		Title:       call.Title,
 		Description: call.Description,
-		CallLink:    call.CallLink,
+		CallLink:    link,
 		HostID:      call.HostID,
 	}
 
