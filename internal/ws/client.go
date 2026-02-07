@@ -8,6 +8,7 @@ import (
 )
 
 type client struct {
+	id string
 	connection *websocket.Conn
 	manager  *Manager
 	egress chan []byte
@@ -18,8 +19,9 @@ type Event struct {
     Payload json.RawMessage `json:"payload"`
 }
 
-func NewClient(conn *websocket.Conn, manager *Manager) *client {
+func NewClient(id string, conn *websocket.Conn, manager *Manager) *client {
 	return &client{
+		id: id,
 		connection: conn,
 		manager: manager,
 		egress: make(chan []byte),
@@ -28,7 +30,13 @@ func NewClient(conn *websocket.Conn, manager *Manager) *client {
 
 
 func (c *client) Listen() {
-	defer c.connection.Close()
+	defer func(){
+		c.manager.mu.Lock()
+		delete(c.manager.clients, c)
+		delete(c.manager.clientsByID, c.id)
+		c.manager.mu.Unlock()
+		c.connection.Close()
+	}()
 
 	for {
 		_,payload,err := c.connection.ReadMessage()
@@ -50,4 +58,34 @@ func (c *client) Listen() {
 	}
 }
 
-func (c *client) Send(message []byte) {}
+func (c *client) Send() {
+
+	defer func() {
+		// remove client safely from manager
+		c.manager.mu.Lock()
+		delete(c.manager.clients, c)
+		delete(c.manager.clientsByID, c.id)
+		c.manager.mu.Unlock()
+
+		// send close frame before closing
+		_ = c.connection.WriteMessage(
+			websocket.CloseMessage,
+			websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""),
+		)
+
+		c.connection.Close()
+	}()
+
+	for {
+		message, ok := <-c.egress
+		if !ok {
+			// channel closed -> stop writer
+			return
+		}
+
+		if err := c.connection.WriteMessage(websocket.TextMessage, message); err != nil {
+			log.Printf("error writing websocket message: %v", err)
+			return
+		}
+	}
+}

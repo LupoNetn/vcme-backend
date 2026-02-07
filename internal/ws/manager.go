@@ -51,8 +51,6 @@ func (m *Manager) ServeWS(c *gin.Context) {
 		return
 	}
 
-	client := NewClient(conn,m)
-	
 
 	//get connected client's id and add to clientsByID map
 	user,exists := c.Get("user")
@@ -61,14 +59,13 @@ func (m *Manager) ServeWS(c *gin.Context) {
 		return
 	}
 	clientID := user.(*util.Claims).UserID
-	m.clientsByID[clientID.String()] = client
-
+	client := NewClient(clientID.String(), conn, m)
 	m.AddClient(client, clientID.String())
 
 
 	//start listening for processes from the clients
 	go client.Listen()
-	go client.Send([]byte("hello from server"))
+	go client.Send()
 }
 
 //register event handlers for the different event types
@@ -99,6 +96,8 @@ func (m *Manager) AddClient(client *client, clientID string) {
 }
 
 func (m *Manager) RemoveClient(client *client, clientID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	if _, ok := m.clients[client]; ok {
 		client.connection.Close()
 		delete(m.clients, client)
