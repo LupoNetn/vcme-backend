@@ -12,6 +12,7 @@ import (
 	call "github.com/luponetn/vcme/internal/calls"
 	"github.com/luponetn/vcme/internal/config"
 	"github.com/luponetn/vcme/internal/db"
+	"github.com/luponetn/vcme/internal/ws"
 )
 
 type app struct {
@@ -76,6 +77,11 @@ func main() {
 	callHandler := call.NewHandler(callsvc)
 
 	router := gin.Default()
+
+	//websocket manager
+	m := ws.NewManager(router)
+	ws.RegisterWSRoutes(router, m, app.config)
+	
 
 	//registering the routes
 	auth.RegisterAuthRoutes(router, authHandler)
