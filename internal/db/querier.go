@@ -11,6 +11,7 @@ import (
 )
 
 type Querier interface {
+	AddUserToCallParticipants(ctx context.Context, arg AddUserToCallParticipantsParams) (CallParticipant, error)
 	CreateCallLink(ctx context.Context, arg CreateCallLinkParams) (Call, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteUser(ctx context.Context, id uuid.UUID) error

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/luponetn/vcme/internal/db"
 	"github.com/luponetn/vcme/internal/util"
 )
 
@@ -79,6 +80,66 @@ func (m *Manager) handleJoinRoom(c *Client, event Event) error {
 		}
 	}
 
+	return nil
+}
+
+func (m *Manager) handleAcceptParticipant(c *Client, event Event) error {
+	var payload AcceptParticipantPayload
+	if err := json.Unmarshal(event.Payload, &payload); err != nil {
+		log.Printf("invalid accept participant payload: %v", err)
+		return err
+	}
+
+	room, ok := m.rooms[payload.CallID]
+	if !ok {
+		log.Printf("room not found for call id: %v", payload.CallID)
+		util.SendEventToClient(c, "error", []byte(`{"message":"room not found"}`))
+		return nil
+	}
+
+	if c.id != room.HostID {
+		util.SendEventToClient(c, "error", []byte(`{"message":"only host can accept participants"}`))
+		return nil
+	}
+
+	room.mu.Lock()
+	defer room.mu.Unlock()
+
+	participantClient, ok := room.WaitingRoom[payload.ParticipantID]
+	if !ok {
+		log.Printf("participant client not found in waiting room for participant id: %v", payload.ParticipantID)
+		util.SendEventToClient(c, "error", []byte(`{"message":"participant client not found in waiting room"}`))
+		return nil
+	}
+	delete(room.WaitingRoom, payload.ParticipantID)
+	room.Participants[payload.ParticipantID] = participantClient
+	log.Printf("participant %v accepted into room %v", payload.ParticipantID, payload.CallID)
+
+	//add to participant's table
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+	callUUID, err := uuid.Parse(payload.CallID)
+	if err != nil {
+		return err
+	}
+
+	userUUID, err := uuid.Parse(payload.ParticipantID)
+	if err != nil {
+		return err
+	}
+
+	params := db.AddUserToCallParticipantsParams{
+		CallID: callUUID,
+		UserID: userUUID,
+	}
+	_, err = m.queries.AddUserToCallParticipants(ctx, params)
+	if err != nil {
+		log.Printf("error adding user to call participants: %v", err)
+		util.SendEventToClient(c, "error", []byte(`{"message":"error adding participant to call in database"}`))
+		return nil
+	}
+
+	util.SendEventToClient(participantClient, "accepted_into_room", []byte(`{"message":"accepted into room"}`))
 	return nil
 }
 

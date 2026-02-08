@@ -19,5 +19,9 @@ RETURNING *;
 -- name: GetHostIDByCallID :one
 SELECT host_id FROM calls WHERE id = $1;
 
+-- name: AddUserToCallParticipants :one
+INSERT INTO call_participants (call_id, user_id)
+VALUES ($1, $2) RETURNING *;
+
 
 

@@ -12,6 +12,30 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const addUserToCallParticipants = `-- name: AddUserToCallParticipants :one
+INSERT INTO call_participants (call_id, user_id)
+VALUES ($1, $2) RETURNING id, call_id, user_id, role, joined_at, left_at
+`
+
+type AddUserToCallParticipantsParams struct {
+	CallID uuid.UUID `json:"call_id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) AddUserToCallParticipants(ctx context.Context, arg AddUserToCallParticipantsParams) (CallParticipant, error) {
+	row := q.db.QueryRow(ctx, addUserToCallParticipants, arg.CallID, arg.UserID)
+	var i CallParticipant
+	err := row.Scan(
+		&i.ID,
+		&i.CallID,
+		&i.UserID,
+		&i.Role,
+		&i.JoinedAt,
+		&i.LeftAt,
+	)
+	return i, err
+}
+
 const createCallLink = `-- name: CreateCallLink :one
 INSERT INTO calls (title,description,call_link,host_id)
 VALUES ($1,$2,$3,$4) RETURNING id, title, description, call_link, host_id, created_at, started_at, ended_at, status
