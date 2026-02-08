@@ -46,6 +46,17 @@ func (q *Queries) CreateCallLink(ctx context.Context, arg CreateCallLinkParams) 
 	return i, err
 }
 
+const getHostIDByCallID = `-- name: GetHostIDByCallID :one
+SELECT host_id FROM calls WHERE id = $1
+`
+
+func (q *Queries) GetHostIDByCallID(ctx context.Context, id uuid.UUID) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, getHostIDByCallID, id)
+	var host_id uuid.UUID
+	err := row.Scan(&host_id)
+	return host_id, err
+}
+
 const listAllCalls = `-- name: ListAllCalls :many
 SELECT id, title, description, call_link, host_id, created_at, started_at, ended_at, status FROM calls
 `

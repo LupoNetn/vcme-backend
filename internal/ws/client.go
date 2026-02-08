@@ -7,7 +7,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type client struct {
+type Client struct {
 	id string
 	connection *websocket.Conn
 	manager  *Manager
@@ -19,8 +19,8 @@ type Event struct {
     Payload json.RawMessage `json:"payload"`
 }
 
-func NewClient(id string, conn *websocket.Conn, manager *Manager) *client {
-	return &client{
+func NewClient(id string, conn *websocket.Conn, manager *Manager) *Client {
+	return &Client{
 		id: id,
 		connection: conn,
 		manager: manager,
@@ -29,7 +29,7 @@ func NewClient(id string, conn *websocket.Conn, manager *Manager) *client {
 }
 
 
-func (c *client) Listen() {
+func (c *Client) Listen() {
 	defer func(){
 		c.manager.mu.Lock()
 		delete(c.manager.clients, c)
@@ -58,7 +58,7 @@ func (c *client) Listen() {
 	}
 }
 
-func (c *client) Send() {
+func (c *Client) Send() {
 
 	defer func() {
 		// remove client safely from manager

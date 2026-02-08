@@ -8,7 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/luponetn/vcme/internal/util"
+	"github.com/luponetn/vcme/internal/db"
 )
 
 var (
@@ -20,24 +20,28 @@ var (
 		}
 )
 
-type clientList map[*client]bool
-type clientsByID map[string]*client
-type eventHandler func(client *client, event Event) error
+type clientList map[*Client]bool
+type clientsByID map[string]*Client
+type eventHandler func(client *Client, event Event) error
 
 type Manager struct {
 	r *gin.Engine
 	clients  clientList
 	clientsByID clientsByID
 	handlers map[string]eventHandler
+	rooms map[string]*Room
 	mu sync.Mutex
+	queries db.Queries
 }
 
-func NewManager(r *gin.Engine) *Manager {
+func NewManager(r *gin.Engine, querier *db.Queries) *Manager {
 	return &Manager{
 		r: r,
 		clients: make(clientList),
 		clientsByID: make(clientsByID),
 		handlers: make(map[string]eventHandler),
+		rooms: make(map[string]*Room),
+		queries: *querier,
 	}
 }
 
@@ -51,17 +55,30 @@ func (m *Manager) ServeWS(c *gin.Context) {
 		return
 	}
 
-
 	//get connected client's id and add to clientsByID map
-	user,exists := c.Get("user")
+	user, exists := c.Get("user")
 	if !exists {
 		log.Printf("error getting client id from context")
+		conn.Close()
 		return
 	}
-	clientID := user.(*util.Claims).UserID
-	client := NewClient(clientID.String(), conn, m)
-	m.AddClient(client, clientID.String())
 
+	var clientIDStr string
+	switch v := user.(type) {
+	case string:
+		clientIDStr = v
+	default:
+		if s, ok := user.(fmt.Stringer); ok {
+			clientIDStr = s.String()
+		} else {
+			log.Printf("unexpected user type in context: %T", user)
+			conn.Close()
+			return
+		}
+	}
+
+	client := NewClient(clientIDStr, conn, m)
+	m.AddClient(client, clientIDStr)
 
 	//start listening for processes from the clients
 	go client.Listen()
@@ -78,7 +95,7 @@ func (m *Manager) RegisterEventHandler() {
 }
 
 //send event to the manager for routing
-func (m *Manager) RouteEvent(c *client, event Event) error {
+func (m *Manager) RouteEvent(c *Client, event Event) error {
   if _, ok := m.handlers[event.EventType]; !ok {
 	log.Printf("no handler for specified event: %v", event.EventType)
 	return fmt.Errorf("no handler for specified event: %v", event.EventType)
@@ -88,14 +105,14 @@ func (m *Manager) RouteEvent(c *client, event Event) error {
 }
 
 
-func (m *Manager) AddClient(client *client, clientID string) {
+func (m *Manager) AddClient(client *Client, clientID string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.clients[client] = true
 	m.clientsByID[clientID] = client
 }
 
-func (m *Manager) RemoveClient(client *client, clientID string) {
+func (m *Manager) RemoveClient(client *Client, clientID string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if _, ok := m.clients[client]; ok {

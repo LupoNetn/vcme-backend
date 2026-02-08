@@ -79,7 +79,7 @@ func main() {
 	router := gin.Default()
 
 	//websocket manager
-	m := ws.NewManager(router)
+	m := ws.NewManager(router, queries)
 	ws.RegisterWSRoutes(router, m, app.config)
 	
 

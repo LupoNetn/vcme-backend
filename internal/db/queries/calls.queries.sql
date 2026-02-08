@@ -16,5 +16,8 @@ description = COALESCE(sql.narg('description'), title)
 WHERE id = $1
 RETURNING *;
 
+-- name: GetHostIDByCallID :one
+SELECT host_id FROM calls WHERE id = $1;
+
 
 
