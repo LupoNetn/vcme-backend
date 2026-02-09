@@ -116,45 +116,11 @@ func (q *Queries) ListAllCalls(ctx context.Context) ([]Call, error) {
 }
 
 const listAllCallsByID = `-- name: ListAllCallsByID :many
-SELECT id, title, description, call_link, host_id, created_at, started_at, ended_at, status FROM calls WHERE id = $1
-`
-
-func (q *Queries) ListAllCallsByID(ctx context.Context, id uuid.UUID) ([]Call, error) {
-	rows, err := q.db.Query(ctx, listAllCallsByID, id)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Call
-	for rows.Next() {
-		var i Call
-		if err := rows.Scan(
-			&i.ID,
-			&i.Title,
-			&i.Description,
-			&i.CallLink,
-			&i.HostID,
-			&i.CreatedAt,
-			&i.StartedAt,
-			&i.EndedAt,
-			&i.Status,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listCallsByHostID = `-- name: ListCallsByHostID :many
 SELECT id, title, description, call_link, host_id, created_at, started_at, ended_at, status FROM calls WHERE host_id = $1 ORDER BY created_at DESC
 `
 
-func (q *Queries) ListCallsByHostID(ctx context.Context, hostID uuid.UUID) ([]Call, error) {
-	rows, err := q.db.Query(ctx, listCallsByHostID, hostID)
+func (q *Queries) ListAllCallsByID(ctx context.Context, hostID uuid.UUID) ([]Call, error) {
+	rows, err := q.db.Query(ctx, listAllCallsByID, hostID)
 	if err != nil {
 		return nil, err
 	}

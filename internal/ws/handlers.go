@@ -54,17 +54,47 @@ func (m *Manager) handleJoinRoom(c *Client, event Event) error {
 		room.Participants[host_id.String()] = c
 		room.mu.Unlock()
 		log.Printf("host %v joined room %v", host_id.String(), payload.CallID)
+
+		hostJoinedPayload := struct {
+			Message string `json:"message"`
+			CallID  string `json:"call_id"`
+		}{
+			Message: "host has joined call",
+			CallID:  payload.CallID,
+		}
+
+		data, err := json.Marshal(hostJoinedPayload)
+		if err != nil {
+			log.Printf("error marshaling waiting room payload: %v", err)
+		} else {
+			util.SendEventToClient(c, "host_joined_room", data)
+		}
 	} else {
 		room, ok := m.rooms[payload.CallID]
 		if !ok {
 
 			util.SendEventToClient(c, "error", []byte(`{"message":"host not yet connected"}`))
+			return nil
 		}
 		room.mu.Lock()
 		room.WaitingRoom[c.id] = c
 		room.mu.Unlock()
 		log.Printf("client %v added to waiting room for room %v", c.id, payload.CallID)
-		util.SendEventToClient(c, "waiting_room", []byte(`{"message":"added to waiting room"}`))
+
+		//send waiting room event to client
+		waitingRoomPayload := struct {
+			Message string `json:"message"`
+			CallID  string `json:"call_id"`
+		}{
+			Message: "added to waiting room",
+			CallID:  payload.CallID,
+		}
+		data, err := json.Marshal(waitingRoomPayload)
+		if err != nil {
+			log.Printf("error marshaling waiting room payload: %v", err)
+		} else {
+			util.SendEventToClient(c, "waiting_room", data)
+		}
 		// include the new participant's client id so the host can identify them
 		newPartPayload := struct {
 			Message  string `json:"message"`

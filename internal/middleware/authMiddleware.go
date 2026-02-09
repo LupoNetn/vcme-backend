@@ -17,8 +17,8 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-// verifyToken parses and validates the JWT using the provided secret.
-func verifyToken(tokenString, secret string) (*Claims, error) {
+// VerifyToken parses and validates the JWT using the provided secret.
+func VerifyToken(tokenString, secret string) (*Claims, error) {
 	if tokenString == "" {
 		return nil, errors.New("empty token")
 	}
@@ -61,7 +61,7 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
 
 		// Validate token using local verifier
-		claims, err := verifyToken(tokenString, cfg.JWTAccessSecret)
+		claims, err := VerifyToken(tokenString, cfg.JWTAccessSecret)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
 			c.Abort()

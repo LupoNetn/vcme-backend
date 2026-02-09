@@ -5,10 +5,10 @@ import (
 	"log"
 )
 
-func SendEventToClient(c interface{}, eventType string, payload []byte) {
+func SendEventToClient(c interface{}, eventType string, payload json.RawMessage) {
 	event := struct {
 		EventType string
-		Payload   []byte
+		Payload   json.RawMessage
 	}{
 		EventType: eventType,
 		Payload:   payload,
@@ -21,9 +21,9 @@ func SendEventToClient(c interface{}, eventType string, payload []byte) {
 	}
 
 	// Send the event to the client
-	if sender, ok := c.(interface{ Send([]byte) }); ok {
-		sender.Send(data)
+	if sender, ok := c.(interface{ SendToClientEgress([]byte) }); ok {
+		sender.SendToClientEgress(data)
 	} else {
-		log.Printf("error sending event: client does not implement Send([]byte)")
+		log.Printf("error sending event: client does not implement SendToClientEgress([]byte)")
 	}
 }

@@ -8,29 +8,28 @@ import (
 )
 
 type Client struct {
-	id string
+	id         string
 	connection *websocket.Conn
-	manager  *Manager
-	egress chan []byte
+	manager    *Manager
+	egress     chan []byte
 }
 
 type Event struct {
-	EventType string `json:"event_type"`
-    Payload json.RawMessage `json:"payload"`
+	EventType string          `json:"event_type"`
+	Payload   json.RawMessage `json:"payload"`
 }
 
 func NewClient(id string, conn *websocket.Conn, manager *Manager) *Client {
 	return &Client{
-		id: id,
+		id:         id,
 		connection: conn,
-		manager: manager,
-		egress: make(chan []byte),
+		manager:    manager,
+		egress:     make(chan []byte),
 	}
 }
 
-
 func (c *Client) Listen() {
-	defer func(){
+	defer func() {
 		c.manager.mu.Lock()
 		delete(c.manager.clients, c)
 		delete(c.manager.clientsByID, c.id)
@@ -39,11 +38,13 @@ func (c *Client) Listen() {
 	}()
 
 	for {
-		_,payload,err := c.connection.ReadMessage()
+		_, payload, err := c.connection.ReadMessage()
 		if err != nil {
 			log.Printf("error reading websocket message: %v", err)
 			break
 		}
+
+		log.Printf("Received message from client: %v", string(payload))
 
 		var event Event
 		if err := json.Unmarshal(payload, &event); err != nil {
@@ -56,6 +57,10 @@ func (c *Client) Listen() {
 			break
 		}
 	}
+}
+
+func (c *Client) SendToClientEgress(data []byte) {
+	c.egress <- data
 }
 
 func (c *Client) Send() {

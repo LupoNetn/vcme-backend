@@ -63,7 +63,7 @@ func (h *Handler) ListCallsByHostID(c *gin.Context) {
 		return
 	}
 
-	calls, err := h.service.ListCallsByHostID(c.Request.Context(), hostID)
+	calls, err := h.service.ListAllCallsByID(c.Request.Context(), hostID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -71,6 +71,19 @@ func (h *Handler) ListCallsByHostID(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "calls successfully retrieved",
+		"calls":   calls,
+	})
+}
+
+func (h *Handler) ListAllCalls(c *gin.Context) {
+	calls, err := h.service.ListAllCalls(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "all calls successfully retrieved",
 		"calls":   calls,
 	})
 }

@@ -8,7 +8,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"github.com/luponetn/vcme/internal/config"
 	"github.com/luponetn/vcme/internal/db"
+	"github.com/luponetn/vcme/internal/middleware"
 )
 
 var (
@@ -16,8 +18,9 @@ var (
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
 		CheckOrigin: func(r *http.Request) bool {
-			return true},
-		}
+			return true
+		},
+	}
 )
 
 type clientList map[*Client]bool
@@ -25,56 +28,55 @@ type clientsByID map[string]*Client
 type eventHandler func(client *Client, event Event) error
 
 type Manager struct {
-	r *gin.Engine
-	clients  clientList
+	r           *gin.Engine
+	clients     clientList
 	clientsByID clientsByID
-	handlers map[string]eventHandler
-	rooms map[string]*Room
-	mu sync.Mutex
-	queries db.Queries
+	handlers    map[string]eventHandler
+	rooms       map[string]*Room
+	mu          sync.Mutex
+	queries     db.Queries
+	cfg         *config.Config
 }
 
-func NewManager(r *gin.Engine, querier *db.Queries) *Manager {
-	return &Manager{
-		r: r,
-		clients: make(clientList),
+func NewManager(r *gin.Engine, querier *db.Queries, cfg *config.Config) *Manager {
+	m := &Manager{
+		r:           r,
+		clients:     make(clientList),
 		clientsByID: make(clientsByID),
-		handlers: make(map[string]eventHandler),
-		rooms: make(map[string]*Room),
-		queries: *querier,
+		handlers:    make(map[string]eventHandler),
+		rooms:       make(map[string]*Room),
+		queries:     *querier,
+		cfg:         cfg,
 	}
+	m.RegisterEventHandler()
+	return m
 }
-
 
 func (m *Manager) ServeWS(c *gin.Context) {
 	log.Println("new websocket connection")
+
+	//get connected client's id from token in query param - Validate BEFORE upgrading
+	token := c.Query("token")
+	if token == "" {
+		log.Printf("no token provided in request")
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "token is required"})
+		return
+	}
+
+	claims, err := middleware.VerifyToken(token, m.cfg.JWTAccessSecret)
+	if err != nil {
+		log.Printf("invalid token: %v", err)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+		return
+	}
+
+	clientIDStr := claims.UserID
+
 	//upgrade http connection to websocket
 	conn, err := websocketUpgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		log.Printf("error upgrading connection: %v", err)
 		return
-	}
-
-	//get connected client's id and add to clientsByID map
-	user, exists := c.Get("user")
-	if !exists {
-		log.Printf("error getting client id from context")
-		conn.Close()
-		return
-	}
-
-	var clientIDStr string
-	switch v := user.(type) {
-	case string:
-		clientIDStr = v
-	default:
-		if s, ok := user.(fmt.Stringer); ok {
-			clientIDStr = s.String()
-		} else {
-			log.Printf("unexpected user type in context: %T", user)
-			conn.Close()
-			return
-		}
 	}
 
 	client := NewClient(clientIDStr, conn, m)
@@ -85,7 +87,7 @@ func (m *Manager) ServeWS(c *gin.Context) {
 	go client.Send()
 }
 
-//register event handlers for the different event types
+// register event handlers for the different event types
 func (m *Manager) RegisterEventHandler() {
 	m.handlers[EventTypeAnswer] = m.handleAnswer
 	m.handlers[EventTypeOffer] = m.handleOffer
@@ -95,16 +97,15 @@ func (m *Manager) RegisterEventHandler() {
 	m.handlers[EventTypeAcceptParticipant] = m.handleAcceptParticipant
 }
 
-//send event to the manager for routing
+// send event to the manager for routing
 func (m *Manager) RouteEvent(c *Client, event Event) error {
-  if _, ok := m.handlers[event.EventType]; !ok {
-	log.Printf("no handler for specified event: %v", event.EventType)
-	return fmt.Errorf("no handler for specified event: %v", event.EventType)
-  }
+	if _, ok := m.handlers[event.EventType]; !ok {
+		log.Printf("no handler for specified event: %v", event.EventType)
+		return fmt.Errorf("no handler for specified event: %v", event.EventType)
+	}
 
-  return m.handlers[event.EventType](c, event)
+	return m.handlers[event.EventType](c, event)
 }
-
 
 func (m *Manager) AddClient(client *Client, clientID string) {
 	m.mu.Lock()

@@ -9,7 +9,8 @@ import (
 
 type Service interface {
 	CreateCallLink(ctx context.Context, arg db.CreateCallLinkParams) (db.Call, error)
-	ListCallsByHostID(ctx context.Context, hostID uuid.UUID) ([]db.Call, error)
+	ListAllCallsByID(ctx context.Context, hostID uuid.UUID) ([]db.Call, error)
+	ListAllCalls(ctx context.Context) ([]db.Call, error)
 }
 
 type Svc struct {
@@ -28,6 +29,10 @@ func (s *Svc) CreateCallLink(ctx context.Context, arg db.CreateCallLinkParams) (
 	return s.queries.CreateCallLink(ctx, arg)
 }
 
-func (s *Svc) ListCallsByHostID(ctx context.Context, hostID uuid.UUID) ([]db.Call, error) {
-	return s.queries.ListCallsByHostID(ctx, hostID)
+func (s *Svc) ListAllCallsByID(ctx context.Context, hostID uuid.UUID) ([]db.Call, error) {
+	return s.queries.ListAllCallsByID(ctx, hostID)
+}
+
+func (s *Svc) ListAllCalls(ctx context.Context) ([]db.Call, error) {
+	return s.queries.ListAllCalls(ctx)
 }

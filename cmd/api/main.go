@@ -78,7 +78,7 @@ func main() {
 	router := NewRouter()
 
 	//websocket manager
-	m := ws.NewManager(router, queries)
+	m := ws.NewManager(router, queries, app.config)
 	ws.RegisterWSRoutes(router, m, app.config)
 
 	//registering the routes
