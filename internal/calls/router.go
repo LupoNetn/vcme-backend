@@ -11,4 +11,5 @@ func RegisterCallRoutes(r *gin.Engine, h *Handler, cfg *config.Config) {
 	callGroup.Use(middleware.AuthMiddleware(cfg))
 
 	callGroup.POST("/", h.CreateCallLink)
+	callGroup.GET("/:host_id", h.ListCallsByHostID)
 }

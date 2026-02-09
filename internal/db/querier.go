@@ -20,6 +20,7 @@ type Querier interface {
 	GetUserById(ctx context.Context, id uuid.UUID) (User, error)
 	ListAllCalls(ctx context.Context) ([]Call, error)
 	ListAllCallsByID(ctx context.Context, id uuid.UUID) ([]Call, error)
+	ListCallsByHostID(ctx context.Context, hostID uuid.UUID) ([]Call, error)
 	ListUsers(ctx context.Context) ([]User, error)
 	UpdateCall(ctx context.Context, id uuid.UUID) (Call, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)

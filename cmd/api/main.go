@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/luponetn/vcme/internal/auth"
 	call "github.com/luponetn/vcme/internal/calls"
@@ -76,12 +75,11 @@ func main() {
 	callsvc := call.NewSvc(queries)
 	callHandler := call.NewHandler(callsvc)
 
-	router := gin.Default()
+	router := NewRouter()
 
 	//websocket manager
 	m := ws.NewManager(router, queries)
 	ws.RegisterWSRoutes(router, m, app.config)
-	
 
 	//registering the routes
 	auth.RegisterAuthRoutes(router, authHandler)

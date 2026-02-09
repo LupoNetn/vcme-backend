@@ -8,6 +8,9 @@ SELECT * FROM calls;
 -- name: ListAllCallsByID :many
 SELECT * FROM calls WHERE id = $1;
 
+-- name: ListCallsByHostID :many
+SELECT * FROM calls WHERE host_id = $1 ORDER BY created_at DESC;
+
 -- name: UpdateCall :one
 UPDATE calls
 SET

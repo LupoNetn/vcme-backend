@@ -92,6 +92,7 @@ func (m *Manager) RegisterEventHandler() {
 	m.handlers[EventTypeJoinRoom] = m.handleJoinRoom
 	m.handlers[EventTypeLeaveRoom] = m.handleLeaveRoom
 	m.handlers[EventTypeICECandidate] = m.handleICECandidate
+	m.handlers[EventTypeAcceptParticipant] = m.handleAcceptParticipant
 }
 
 //send event to the manager for routing
