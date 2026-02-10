@@ -116,7 +116,6 @@ func (m *Manager) AddClient(client *Client, clientID string) {
 
 func (m *Manager) RemoveClient(client *Client, clientID string) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	if _, ok := m.clients[client]; ok {
 		client.connection.Close()
 		delete(m.clients, client)
@@ -124,5 +123,41 @@ func (m *Manager) RemoveClient(client *Client, clientID string) {
 
 	if clientID != "" {
 		delete(m.clientsByID, clientID)
+	}
+	m.mu.Unlock()
+
+	// Cleanup from any room they were in
+	if client.RoomID != "" {
+		m.RemoveClientFromRoom(client)
+	}
+}
+
+func (m *Manager) RemoveClientFromRoom(c *Client) {
+	m.mu.Lock()
+	room, ok := m.rooms[c.RoomID]
+	m.mu.Unlock()
+
+	if !ok {
+		return
+	}
+
+	room.mu.Lock()
+	delete(room.Participants, c.id)
+	delete(room.WaitingRoom, c.id)
+	isEmpty := len(room.Participants) == 0 && len(room.WaitingRoom) == 0
+	room.mu.Unlock()
+
+	if isEmpty {
+		m.mu.Lock()
+		// Re-check under manager lock to avoid race conditions
+		if r, ok := m.rooms[c.RoomID]; ok {
+			r.mu.Lock()
+			if len(r.Participants) == 0 && len(r.WaitingRoom) == 0 {
+				delete(m.rooms, c.RoomID)
+				log.Printf("room %s deleted as it is empty", c.RoomID)
+			}
+			r.mu.Unlock()
+		}
+		m.mu.Unlock()
 	}
 }

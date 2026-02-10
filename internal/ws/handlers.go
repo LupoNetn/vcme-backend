@@ -34,6 +34,7 @@ func (m *Manager) handleJoinRoom(c *Client, event Event) error {
 		log.Printf("invalid call id: %v", err)
 		return err
 	}
+	c.RoomID = payload.CallID // Store the room the client is currently in
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 	host_id, err := m.queries.GetHostIDByCallID(ctx, callID)
@@ -95,13 +96,23 @@ func (m *Manager) handleJoinRoom(c *Client, event Event) error {
 		} else {
 			util.SendEventToClient(c, "waiting_room", data)
 		}
+		// get requester name
+		reqUUID, _ := uuid.Parse(c.id)
+		reqUser, err := m.queries.GetUserById(ctx, reqUUID)
+		userName := "Anonymous"
+		if err == nil {
+			userName = reqUser.Name
+		}
+
 		// include the new participant's client id so the host can identify them
 		newPartPayload := struct {
-			Message  string `json:"message"`
-			ClientID string `json:"client_id"`
+			Message    string `json:"message"`
+			ClientID   string `json:"client_id"`
+			ClientName string `json:"client_name"`
 		}{
-			Message:  "a new user wants to join call",
-			ClientID: c.id,
+			Message:    userName + " wants to join the call",
+			ClientID:   c.id,
+			ClientName: userName,
 		}
 		b, err := json.Marshal(newPartPayload)
 		if err != nil {
@@ -123,11 +134,11 @@ func (m *Manager) handleAcceptParticipant(c *Client, event Event) error {
 
 	room, ok := m.rooms[payload.CallID]
 	if !ok {
-		log.Printf("room not found for call id: %v", payload.CallID)
 		util.SendEventToClient(c, "error", []byte(`{"message":"room not found"}`))
 		return nil
 	}
 
+	// only host can accept
 	if c.id != room.HostID {
 		util.SendEventToClient(c, "error", []byte(`{"message":"only host can accept participants"}`))
 		return nil
@@ -136,25 +147,27 @@ func (m *Manager) handleAcceptParticipant(c *Client, event Event) error {
 	room.mu.Lock()
 	defer room.mu.Unlock()
 
+	// ---------------------------
+	// get client from waiting room
+	// ---------------------------
 	participantClient, ok := room.WaitingRoom[payload.ParticipantID]
 	if !ok {
-		log.Printf("participant client not found in waiting room for participant id: %v", payload.ParticipantID)
-		util.SendEventToClient(c, "error", []byte(`{"message":"participant client not found in waiting room"}`))
+		util.SendEventToClient(c, "error", []byte(`{"message":"participant not in waiting room"}`))
 		return nil
 	}
-	delete(room.WaitingRoom, payload.ParticipantID)
-	room.Participants[payload.ParticipantID] = participantClient
-	log.Printf("participant %v accepted into room %v", payload.ParticipantID, payload.CallID)
 
-	//participant's list
-	participantList := make([]string, 0, len(room.Participants))
-	for participantID := range room.Participants {
-		participantList = append(participantList, participantID)
+	// if already in memory just ignore
+	if _, exists := room.Participants[payload.ParticipantID]; exists {
+		log.Printf("participant already in memory room: %s", payload.ParticipantID)
+		return nil
 	}
 
-	//add to participant's table
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	// ---------------------------
+	// DB logic (UPSERT-LIKE)
+	// ---------------------------
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
 	callUUID, err := uuid.Parse(payload.CallID)
 	if err != nil {
 		return err
@@ -165,18 +178,41 @@ func (m *Manager) handleAcceptParticipant(c *Client, event Event) error {
 		return err
 	}
 
-	params := db.AddUserToCallParticipantsParams{
+	// check if already exists in DB
+	_, err = m.queries.GetCallParticipant(ctx, db.GetCallParticipantParams{
 		CallID: callUUID,
 		UserID: userUUID,
-	}
-	_, err = m.queries.AddUserToCallParticipants(ctx, params)
+	})
+
 	if err != nil {
-		log.Printf("error adding user to call participants: %v", err)
-		util.SendEventToClient(c, "error", []byte(`{"message":"error adding participant to call in database"}`))
-		return nil
+		// not found → insert
+		addParams := db.AddUserToCallParticipantsParams{
+			CallID: callUUID,
+			UserID: userUUID,
+		}
+
+		_, err = m.queries.AddUserToCallParticipants(ctx, addParams)
+		if err != nil {
+			log.Printf("error adding participant to db: %v", err)
+			util.SendEventToClient(c, "error", []byte(`{"message":"db insert failed"}`))
+			return nil
+		}
 	}
 
-	//send acceptance event to participant with list of current participants in the room
+	// ---------------------------
+	// MOVE USER INTO ROOM MEMORY
+	// ---------------------------
+	delete(room.WaitingRoom, payload.ParticipantID)
+	room.Participants[payload.ParticipantID] = participantClient
+
+	log.Printf("participant %s accepted into room %s", payload.ParticipantID, payload.CallID)
+
+	// build participant list
+	participantList := make([]string, 0, len(room.Participants))
+	for id := range room.Participants {
+		participantList = append(participantList, id)
+	}
+
 	acceptedPayload := struct {
 		Message       string   `json:"message"`
 		CallID        string   `json:"call_id"`
@@ -188,10 +224,10 @@ func (m *Manager) handleAcceptParticipant(c *Client, event Event) error {
 		Participants:  participantList,
 		ParticipantID: payload.ParticipantID,
 	}
+
 	b, err := json.Marshal(acceptedPayload)
 	if err != nil {
-		log.Printf("error marshaling accepted payload: %v", err)
-		util.SendEventToClient(c, "error", []byte(`{"message":"error preparing acceptance payload"}`))
+		util.SendEventToClient(c, "error", []byte(`{"message":"marshal error"}`))
 		return nil
 	}
 
@@ -200,7 +236,24 @@ func (m *Manager) handleAcceptParticipant(c *Client, event Event) error {
 }
 
 func (m *Manager) handleLeaveRoom(c *Client, event Event) error {
-	//handle leave room event
+	var payload LeaveRoomPayload
+	if err := json.Unmarshal(event.Payload, &payload); err != nil {
+		log.Printf("invalid leave room payload: %v", err)
+		return err
+	}
+
+	_, ok := m.rooms[payload.CallID]
+	if !ok {
+		util.SendEventToClient(c, "error", []byte(`{"message":"room not found"}`))
+		return nil
+	}
+
+	// Cleanup from the room
+	m.RemoveClientFromRoom(c)
+	c.RoomID = "" // Clear the room assignment
+
+	log.Printf("participant %s left room %s", payload.ParticipantID, payload.CallID)
+	util.SendEventToClient(c, "left_room", []byte(`{"message":"left room"}`))
 	return nil
 }
 

@@ -1,6 +1,5 @@
 package ws
 
-
 import (
 	"encoding/json"
 )
@@ -11,6 +10,11 @@ type JoinRoomPayload struct {
 }
 
 type AcceptParticipantPayload struct {
+	CallID        string `json:"call_id"`
+	ParticipantID string `json:"participant_id"`
+}
+
+type LeaveRoomPayload struct {
 	CallID        string `json:"call_id"`
 	ParticipantID string `json:"participant_id"`
 }

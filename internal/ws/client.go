@@ -12,6 +12,7 @@ type Client struct {
 	connection *websocket.Conn
 	manager    *Manager
 	egress     chan []byte
+	RoomID     string
 }
 
 type Event struct {

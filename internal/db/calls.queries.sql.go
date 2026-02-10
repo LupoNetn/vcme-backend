@@ -70,6 +70,29 @@ func (q *Queries) CreateCallLink(ctx context.Context, arg CreateCallLinkParams) 
 	return i, err
 }
 
+const getCallParticipant = `-- name: GetCallParticipant :one
+SELECT id, call_id, user_id, role, joined_at, left_at FROM call_participants WHERE call_id = $1 AND user_id = $2
+`
+
+type GetCallParticipantParams struct {
+	CallID uuid.UUID `json:"call_id"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) GetCallParticipant(ctx context.Context, arg GetCallParticipantParams) (CallParticipant, error) {
+	row := q.db.QueryRow(ctx, getCallParticipant, arg.CallID, arg.UserID)
+	var i CallParticipant
+	err := row.Scan(
+		&i.ID,
+		&i.CallID,
+		&i.UserID,
+		&i.Role,
+		&i.JoinedAt,
+		&i.LeftAt,
+	)
+	return i, err
+}
+
 const getHostIDByCallID = `-- name: GetHostIDByCallID :one
 SELECT host_id FROM calls WHERE id = $1
 `
