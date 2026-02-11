@@ -95,6 +95,8 @@ func (m *Manager) RegisterEventHandler() {
 	m.handlers[EventTypeLeaveRoom] = m.handleLeaveRoom
 	m.handlers[EventTypeICECandidate] = m.handleICECandidate
 	m.handlers[EventTypeAcceptParticipant] = m.handleAcceptParticipant
+	m.handlers[EventTypeDeclineParticipant] = m.handleDeclineParticipant
+	m.handlers[EventTypeGetInitiator] = m.handleGetInitiator
 }
 
 // send event to the manager for routing
@@ -144,6 +146,15 @@ func (m *Manager) RemoveClientFromRoom(c *Client) {
 	room.mu.Lock()
 	delete(room.Participants, c.id)
 	delete(room.WaitingRoom, c.id)
+
+	// Remove from ParticipantsList
+	for i, id := range room.ParticipantsList {
+		if id == c.id {
+			room.ParticipantsList = append(room.ParticipantsList[:i], room.ParticipantsList[i+1:]...)
+			break
+		}
+	}
+
 	isEmpty := len(room.Participants) == 0 && len(room.WaitingRoom) == 0
 	room.mu.Unlock()
 

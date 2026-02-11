@@ -13,12 +13,14 @@ import (
 
 var (
 	//event types
-	EventTypeJoinRoom          = "join_room"
-	EventTypeLeaveRoom         = "leave_room"
-	EventTypeOffer             = "offer"
-	EventTypeAnswer            = "answer"
-	EventTypeICECandidate      = "ice_candidate"
-	EventTypeAcceptParticipant = "accept_participant"
+	EventTypeJoinRoom           = "join_room"
+	EventTypeLeaveRoom          = "leave_room"
+	EventTypeOffer              = "offer"
+	EventTypeAnswer             = "answer"
+	EventTypeICECandidate       = "ice_candidate"
+	EventTypeAcceptParticipant  = "accept_participant"
+	EventTypeDeclineParticipant = "decline_participant"
+	EventTypeGetInitiator       = "get_initiator"
 )
 
 // handlers for the different event types
@@ -53,15 +55,18 @@ func (m *Manager) handleJoinRoom(c *Client, event Event) error {
 
 		room.mu.Lock()
 		room.Participants[host_id.String()] = c
+		room.ParticipantsList = append(room.ParticipantsList, host_id.String())
 		room.mu.Unlock()
 		log.Printf("host %v joined room %v", host_id.String(), payload.CallID)
 
 		hostJoinedPayload := struct {
 			Message string `json:"message"`
 			CallID  string `json:"call_id"`
+			HostID  string `json:"host_id"`
 		}{
 			Message: "host has joined call",
 			CallID:  payload.CallID,
+			HostID:  host_id.String(),
 		}
 
 		data, err := json.Marshal(hostJoinedPayload)
@@ -118,7 +123,7 @@ func (m *Manager) handleJoinRoom(c *Client, event Event) error {
 		if err != nil {
 			log.Printf("error marshaling new_participant payload: %v", err)
 		} else {
-			util.SendEventToClient(room.HostClient, "new_participant", b)
+			util.SendEventToClient(room.HostClient, "new_participant_request", b)
 		}
 	}
 
@@ -199,19 +204,36 @@ func (m *Manager) handleAcceptParticipant(c *Client, event Event) error {
 		}
 	}
 
-	// ---------------------------
-	// MOVE USER INTO ROOM MEMORY
-	// ---------------------------
-	delete(room.WaitingRoom, payload.ParticipantID)
-	room.Participants[payload.ParticipantID] = participantClient
-
-	log.Printf("participant %s accepted into room %s", payload.ParticipantID, payload.CallID)
-
 	// build participant list
 	participantList := make([]string, 0, len(room.Participants))
 	for id := range room.Participants {
 		participantList = append(participantList, id)
 	}
+	//send the new user to each participant
+	newParticipantsPayload := struct {
+		Message          string `json:"message"`
+		NewParticipantID string `json:"new_participant_id"`
+	}{
+		Message:          "new participant joined",
+		NewParticipantID: payload.ParticipantID,
+	}
+	newPartB, err := json.Marshal(newParticipantsPayload)
+	if err != nil {
+		util.SendEventToClient(c, "error", []byte(`{"message":"marshal error"}`))
+		return nil
+	}
+	for _, id := range participantList {
+		util.SendEventToClient(room.Participants[id], "new_participant", newPartB)
+	}
+
+	// ---------------------------
+	// MOVE USER INTO ROOM MEMORY
+	// ---------------------------
+	delete(room.WaitingRoom, payload.ParticipantID)
+	room.Participants[payload.ParticipantID] = participantClient
+	room.ParticipantsList = append(room.ParticipantsList, payload.ParticipantID)
+
+	log.Printf("participant %s accepted into room %s", payload.ParticipantID, payload.CallID)
 
 	acceptedPayload := struct {
 		Message       string   `json:"message"`
@@ -232,6 +254,40 @@ func (m *Manager) handleAcceptParticipant(c *Client, event Event) error {
 	}
 
 	util.SendEventToClient(participantClient, "accepted_into_room", b)
+	return nil
+}
+
+func (m *Manager) handleDeclineParticipant(c *Client, event Event) error {
+	var payload AcceptParticipantPayload // reusing same payload structure
+	if err := json.Unmarshal(event.Payload, &payload); err != nil {
+		log.Printf("invalid decline participant payload: %v", err)
+		return err
+	}
+
+	room, ok := m.rooms[payload.CallID]
+	if !ok {
+		util.SendEventToClient(c, "error", []byte(`{"message":"room not found"}`))
+		return nil
+	}
+
+	// only host can decline
+	if c.id != room.HostID {
+		util.SendEventToClient(c, "error", []byte(`{"message":"only host can decline participants"}`))
+		return nil
+	}
+
+	room.mu.Lock()
+	participantClient, ok := room.WaitingRoom[payload.ParticipantID]
+	if ok {
+		delete(room.WaitingRoom, payload.ParticipantID)
+	}
+	room.mu.Unlock()
+
+	if ok {
+		log.Printf("participant %s declined from room %s", payload.ParticipantID, payload.CallID)
+		util.SendEventToClient(participantClient, "declined_from_room", []byte(`{"message":"your request to join was declined", "call_id":"`+payload.CallID+`"}`))
+	}
+
 	return nil
 }
 
@@ -422,5 +478,68 @@ func (m *Manager) handleICECandidate(c *Client, event Event) error {
 	}
 
 	util.SendEventToClient(targetClient, "ice_candidate", b)
+	return nil
+}
+
+func (m *Manager) handleGetInitiator(c *Client, event Event) error {
+	var payload struct {
+		CallID        string `json:"call_id"`
+		ParticipantID string `json:"participant_id"`
+	}
+
+	if err := json.Unmarshal(event.Payload, &payload); err != nil {
+		log.Printf("invalid get initiator payload: %v", err)
+		return err
+	}
+
+	m.mu.Lock()
+	room, ok := m.rooms[payload.CallID]
+	m.mu.Unlock()
+
+	var hostID string
+	var targetID string
+	if ok {
+		room.mu.Lock()
+		if len(room.ParticipantsList) > 0 {
+			hostID = room.ParticipantsList[len(room.ParticipantsList)-1]
+		} else {
+			hostID = room.HostID
+		}
+		targetID = room.ParticipantsList[0]
+		room.mu.Unlock()
+	} else {
+		// Fallback to DB if room not in memory
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+		defer cancel()
+
+		callUUID, err := uuid.Parse(payload.CallID)
+		if err != nil {
+			return err
+		}
+
+		hostUUID, err := m.queries.GetHostIDByCallID(ctx, callUUID)
+		if err != nil {
+			log.Printf("error getting host id from db: %v", err)
+			return err
+		}
+		hostID = hostUUID.String()
+	}
+
+	resPayload := struct {
+		HostID   string `json:"host_id"`
+		CallID   string `json:"call_id"`
+		TargetID string `json:"target_id"`
+	}{
+		HostID:   hostID,
+		CallID:   payload.CallID,
+		TargetID: targetID,
+	}
+
+	data, err := json.Marshal(resPayload)
+	if err != nil {
+		return err
+	}
+
+	util.SendEventToClient(c, "initiator_res", data)
 	return nil
 }
