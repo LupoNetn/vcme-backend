@@ -12,6 +12,7 @@ type Config struct {
 	Port             string
 	JWTAccessSecret  string
 	JWTRefreshSecret string
+	ClientOrigin     string
 }
 
 // LoadConfig initializes the configuration.
@@ -37,11 +38,14 @@ func LoadConfig() (*Config, error) {
 		return nil, err
 	}
 
+	clientOrigin := getEnvWithDefault("CLIENT_URL", "http://localhost:5173")
+
 	return &Config{
 		DatabaseURL:      dbURL,
 		Port:             port,
 		JWTAccessSecret:  jwtAccessSecret,
 		JWTRefreshSecret: jwtRefreshSecret,
+		ClientOrigin:     clientOrigin,
 	}, nil
 }
 

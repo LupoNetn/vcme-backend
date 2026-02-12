@@ -75,7 +75,7 @@ func main() {
 	callsvc := call.NewSvc(queries)
 	callHandler := call.NewHandler(callsvc)
 
-	router := NewRouter()
+	router := NewRouter(app.config)
 
 	//websocket manager
 	m := ws.NewManager(router, queries, app.config)
