@@ -1,7 +1,9 @@
 package call
 
 import (
+	"log"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -33,7 +35,7 @@ func (h *Handler) CreateCallLink(c *gin.Context) {
 		return
 	}
 
-	link := util.GenerateCallLink(call.Title, "vcme")
+	link := util.GenerateCallLink("jumbotronm", call.Title)
 
 	params := db.CreateCallLinkParams{
 		Title:       call.Title,
@@ -85,5 +87,23 @@ func (h *Handler) ListAllCalls(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "all calls successfully retrieved",
 		"calls":   calls,
+	})
+}
+func (h *Handler) GetCallByLink(c *gin.Context) {
+	link := c.Param("link")
+	// Gin wildcard params include the leading slash, so we trim it
+	link = strings.TrimPrefix(link, "/")
+	log.Printf("Searching for call link: [%s]", link)
+
+	call, err := h.service.GetCallByLink(c.Request.Context(), link)
+	if err != nil {
+		log.Printf("Call not found for link: [%s], error: %v", link, err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "call not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "call successfully retrieved",
+		"call":    call,
 	})
 }

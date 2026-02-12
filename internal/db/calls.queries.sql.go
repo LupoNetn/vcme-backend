@@ -70,6 +70,46 @@ func (q *Queries) CreateCallLink(ctx context.Context, arg CreateCallLinkParams) 
 	return i, err
 }
 
+const getCallByLink = `-- name: GetCallByLink :one
+SELECT 
+    c.id, c.title, c.description, c.call_link, c.host_id, c.created_at, c.started_at, c.ended_at, c.status,
+    u.name as host_name
+FROM calls c
+JOIN users u ON c.host_id = u.id
+WHERE LOWER(c.call_link) = LOWER($1)
+`
+
+type GetCallByLinkRow struct {
+	ID          uuid.UUID          `json:"id"`
+	Title       string             `json:"title"`
+	Description pgtype.Text        `json:"description"`
+	CallLink    string             `json:"call_link"`
+	HostID      uuid.UUID          `json:"host_id"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	StartedAt   pgtype.Timestamptz `json:"started_at"`
+	EndedAt     pgtype.Timestamptz `json:"ended_at"`
+	Status      string             `json:"status"`
+	HostName    string             `json:"host_name"`
+}
+
+func (q *Queries) GetCallByLink(ctx context.Context, lower string) (GetCallByLinkRow, error) {
+	row := q.db.QueryRow(ctx, getCallByLink, lower)
+	var i GetCallByLinkRow
+	err := row.Scan(
+		&i.ID,
+		&i.Title,
+		&i.Description,
+		&i.CallLink,
+		&i.HostID,
+		&i.CreatedAt,
+		&i.StartedAt,
+		&i.EndedAt,
+		&i.Status,
+		&i.HostName,
+	)
+	return i, err
+}
+
 const getCallParticipant = `-- name: GetCallParticipant :one
 SELECT id, call_id, user_id, role, joined_at, left_at FROM call_participants WHERE call_id = $1 AND user_id = $2
 `

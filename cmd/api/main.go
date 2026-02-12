@@ -23,7 +23,7 @@ type app struct {
 func ConnectDb(cfg *config.Config) (*pgxpool.Pool, error) {
 	config, err := pgxpool.ParseConfig(cfg.DatabaseURL)
 	if err != nil {
-		log.Fatal("an error occurred here")
+		log.Println("an error occurred here")
 		return nil, err
 	}
 
@@ -36,12 +36,12 @@ func ConnectDb(cfg *config.Config) (*pgxpool.Pool, error) {
 
 	db, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
-		log.Fatal("could not create db connection")
+		log.Println("could not create db connection")
 		return nil, err
 	}
 
 	if err := db.Ping(ctx); err != nil {
-		log.Fatal("Unable to ping db")
+		log.Println("Unable to ping db")
 		return nil, err
 	}
 
@@ -96,5 +96,4 @@ func main() {
 	log.Printf("starting up server on port: %s", app.config.Port)
 
 	log.Fatal(server.ListenAndServe())
-
 }

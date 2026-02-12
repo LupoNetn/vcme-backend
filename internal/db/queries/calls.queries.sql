@@ -26,5 +26,10 @@ VALUES ($1, $2) RETURNING * ;
 -- name: GetCallParticipant :one
 SELECT * FROM call_participants WHERE call_id = $1 AND user_id = $2;
 
-
-
+-- name: GetCallByLink :one
+SELECT 
+    c.*,
+    u.name as host_name
+FROM calls c
+JOIN users u ON c.host_id = u.id
+WHERE LOWER(c.call_link) = LOWER($1);

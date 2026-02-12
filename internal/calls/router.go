@@ -13,4 +13,7 @@ func RegisterCallRoutes(r *gin.Engine, h *Handler, cfg *config.Config) {
 	callGroup.POST("/", h.CreateCallLink)
 	callGroup.GET("/", h.ListAllCalls)
 	callGroup.GET("/:host_id", h.ListCallsByHostID)
+
+	// Public search route
+	r.GET("/calls/link/*link", h.GetCallByLink)
 }
