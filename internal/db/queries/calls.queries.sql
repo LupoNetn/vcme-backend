@@ -33,3 +33,9 @@ SELECT
 FROM calls c
 JOIN users u ON c.host_id = u.id
 WHERE LOWER(c.call_link) = LOWER($1);
+
+-- name: EndCall :one
+INSERT INTO call_logs (user_id,call_id,participant,type,time,call_title,duration,participant_count,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *;
+
+-- name: GetCallLogsByUserID :many
+SELECT * FROM call_logs WHERE user_id = $1 ORDER BY created_at DESC;

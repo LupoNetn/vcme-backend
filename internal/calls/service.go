@@ -12,6 +12,8 @@ type Service interface {
 	ListAllCallsByID(ctx context.Context, hostID uuid.UUID) ([]db.Call, error)
 	ListAllCalls(ctx context.Context) ([]db.Call, error)
 	GetCallByLink(ctx context.Context, link string) (db.GetCallByLinkRow, error)
+	EndCall(ctx context.Context, arg db.EndCallParams) (db.CallLog, error)
+	GetCallLogsByUserID(ctx context.Context, userID uuid.UUID) ([]db.CallLog, error)
 }
 
 type Svc struct {
@@ -40,4 +42,12 @@ func (s *Svc) ListAllCalls(ctx context.Context) ([]db.Call, error) {
 
 func (s *Svc) GetCallByLink(ctx context.Context, link string) (db.GetCallByLinkRow, error) {
 	return s.queries.GetCallByLink(ctx, link)
+}
+
+func (s *Svc) EndCall(ctx context.Context, arg db.EndCallParams) (db.CallLog, error) {
+	return s.queries.EndCall(ctx, arg)
+}
+
+func (s *Svc) GetCallLogsByUserID(ctx context.Context, userID uuid.UUID) ([]db.CallLog, error) {
+	return s.queries.GetCallLogsByUserID(ctx, userID)
 }

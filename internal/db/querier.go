@@ -15,7 +15,9 @@ type Querier interface {
 	CreateCallLink(ctx context.Context, arg CreateCallLinkParams) (Call, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	DeleteUser(ctx context.Context, id uuid.UUID) error
+	EndCall(ctx context.Context, arg EndCallParams) (CallLog, error)
 	GetCallByLink(ctx context.Context, lower string) (GetCallByLinkRow, error)
+	GetCallLogsByUserID(ctx context.Context, userID uuid.UUID) ([]CallLog, error)
 	GetCallParticipant(ctx context.Context, arg GetCallParticipantParams) (CallParticipant, error)
 	GetHostIDByCallID(ctx context.Context, id uuid.UUID) (uuid.UUID, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)

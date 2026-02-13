@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -105,5 +106,73 @@ func (h *Handler) GetCallByLink(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "call successfully retrieved",
 		"call":    call,
+	})
+}
+
+func (h *Handler) EndCall(c *gin.Context) {
+	type endCallParams struct {
+		UserID           uuid.UUID   `json:"user_id"`
+		CallID           uuid.UUID   `json:"call_id"`
+		Participant      pgtype.Text `json:"participant"`
+		Type             pgtype.Text `json:"type"`
+		Time             pgtype.Text `json:"time"`
+		CallTitle        pgtype.Text `json:"call_title"`
+		Duration         string      `json:"duration"`
+		ParticipantCount int32       `json:"participant_count"`
+	}
+	var endCall endCallParams
+	log.Printf("user foreign id = %v", endCall.UserID)
+	if err := c.ShouldBindJSON(&endCall); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	t := pgtype.Timestamptz{
+		Time:  time.Now(),
+		Valid: true,
+	}
+
+	endP := db.EndCallParams{
+		UserID:           endCall.UserID,
+		CallID:           endCall.CallID,
+		Participant:      endCall.Participant,
+		Type:             endCall.Type,
+		Time:             endCall.Time,
+		CallTitle:        endCall.CallTitle,
+		Duration:         endCall.Duration,
+		ParticipantCount: endCall.ParticipantCount,
+		CreatedAt:        t,
+	}
+
+	endedCall, err := h.service.EndCall(c.Request.Context(), endP)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "call successfully ended",
+		"call":    endedCall,
+	})
+}
+
+func (h *Handler) GetCallLogsByUserID(c *gin.Context) {
+	userIDStr := c.Param("user_id")
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+		return
+	}
+
+	callLogs, err := h.service.GetCallLogsByUserID(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":  "call logs successfully retrieved",
+		"call_logs": callLogs,
 	})
 }

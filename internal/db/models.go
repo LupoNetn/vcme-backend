@@ -25,8 +25,13 @@ type CallLog struct {
 	ID               uuid.UUID          `json:"id"`
 	CallID           uuid.UUID          `json:"call_id"`
 	ParticipantCount int32              `json:"participant_count"`
-	Duration         int32              `json:"duration"`
+	Duration         string             `json:"duration"`
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	Type             pgtype.Text        `json:"type"`
+	Time             pgtype.Text        `json:"time"`
+	CallTitle        pgtype.Text        `json:"call_title"`
+	Participant      pgtype.Text        `json:"participant"`
+	UserID           uuid.UUID          `json:"user_id"`
 }
 
 type CallParticipant struct {

@@ -70,6 +70,50 @@ func (q *Queries) CreateCallLink(ctx context.Context, arg CreateCallLinkParams) 
 	return i, err
 }
 
+const endCall = `-- name: EndCall :one
+INSERT INTO call_logs (user_id,call_id,participant,type,time,call_title,duration,participant_count,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id, call_id, participant_count, duration, created_at, type, time, call_title, participant, user_id
+`
+
+type EndCallParams struct {
+	UserID           uuid.UUID          `json:"user_id"`
+	CallID           uuid.UUID          `json:"call_id"`
+	Participant      pgtype.Text        `json:"participant"`
+	Type             pgtype.Text        `json:"type"`
+	Time             pgtype.Text        `json:"time"`
+	CallTitle        pgtype.Text        `json:"call_title"`
+	Duration         string             `json:"duration"`
+	ParticipantCount int32              `json:"participant_count"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) EndCall(ctx context.Context, arg EndCallParams) (CallLog, error) {
+	row := q.db.QueryRow(ctx, endCall,
+		arg.UserID,
+		arg.CallID,
+		arg.Participant,
+		arg.Type,
+		arg.Time,
+		arg.CallTitle,
+		arg.Duration,
+		arg.ParticipantCount,
+		arg.CreatedAt,
+	)
+	var i CallLog
+	err := row.Scan(
+		&i.ID,
+		&i.CallID,
+		&i.ParticipantCount,
+		&i.Duration,
+		&i.CreatedAt,
+		&i.Type,
+		&i.Time,
+		&i.CallTitle,
+		&i.Participant,
+		&i.UserID,
+	)
+	return i, err
+}
+
 const getCallByLink = `-- name: GetCallByLink :one
 SELECT 
     c.id, c.title, c.description, c.call_link, c.host_id, c.created_at, c.started_at, c.ended_at, c.status,
@@ -108,6 +152,41 @@ func (q *Queries) GetCallByLink(ctx context.Context, lower string) (GetCallByLin
 		&i.HostName,
 	)
 	return i, err
+}
+
+const getCallLogsByUserID = `-- name: GetCallLogsByUserID :many
+SELECT id, call_id, participant_count, duration, created_at, type, time, call_title, participant, user_id FROM call_logs WHERE user_id = $1 ORDER BY created_at DESC
+`
+
+func (q *Queries) GetCallLogsByUserID(ctx context.Context, userID uuid.UUID) ([]CallLog, error) {
+	rows, err := q.db.Query(ctx, getCallLogsByUserID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CallLog
+	for rows.Next() {
+		var i CallLog
+		if err := rows.Scan(
+			&i.ID,
+			&i.CallID,
+			&i.ParticipantCount,
+			&i.Duration,
+			&i.CreatedAt,
+			&i.Type,
+			&i.Time,
+			&i.CallTitle,
+			&i.Participant,
+			&i.UserID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getCallParticipant = `-- name: GetCallParticipant :one
