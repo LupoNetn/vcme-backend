@@ -2,44 +2,32 @@ package util
 
 import (
 	"crypto/rand"
-	"encoding/hex"
-	"fmt"
-	"regexp"
-	"strings"
+	"math/big"
 )
 
-// convert title into a clean url format
-func Slugify(input string) string {
-	s := strings.ToLower(input)
+// Base62 characters (0-9, A-Z, a-z)
+const base62Chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
-	//replace spaces with dash
-	s = strings.ReplaceAll(s, " ", "-")
-
-	//remove non url-safe chars
-	reg := regexp.MustCompile(`[^a-z0-9\-]`)
-	s = reg.ReplaceAllString(s, "")
-
-	return s
+// GenerateShortCode generates a random base62 string of specified length
+// This creates short, URL-safe codes like: "aB3xK9Qm"
+func GenerateShortCode(length int) string {
+	result := make([]byte, length)
+	for i := 0; i < length; i++ {
+		num, _ := rand.Int(rand.Reader, big.NewInt(int64(len(base62Chars))))
+		result[i] = base62Chars[num.Int64()]
+	}
+	return string(result)
 }
 
-//generate a random unique string
-
-func GnerateRandomID(n int) string {
-	bytes := make([]byte, n)
-	rand.Read(bytes)
-
-	return hex.EncodeToString(bytes)
+// GenerateCallLink creates a short, clean call link
+// Format: vcme.com/join/aB3xK9Qm (8 characters by default)
+func GenerateCallLink(appDomain string) string {
+	shortCode := GenerateShortCode(8)
+	return appDomain + "/join/" + shortCode
 }
 
-//combine both functions to create a well formated call link
-
-func GenerateCallLink(appName string, callTitle string) string {
-	app := Slugify(appName)
-	title := Slugify(callTitle)
-
-	randomID := GnerateRandomID(3)
-
-	link := fmt.Sprintf("%s.com/v/%s-%s", app, title, randomID)
-
-	return link
+// GenerateCallCode generates just the code without domain
+// Useful for displaying to users: "Meeting Code: aB3xK9Qm"
+func GenerateCallCode() string {
+	return GenerateShortCode(8)
 }

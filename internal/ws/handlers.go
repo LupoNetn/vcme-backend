@@ -298,17 +298,52 @@ func (m *Manager) handleLeaveRoom(c *Client, event Event) error {
 		return err
 	}
 
-	_, ok := m.rooms[payload.CallID]
+	room, ok := m.rooms[payload.CallID]
 	if !ok {
 		util.SendEventToClient(c, "error", []byte(`{"message":"room not found"}`))
 		return nil
 	}
 
+	// Check if the person leaving is the host
+	isHost := c.id == room.HostID
+
+	// Notify all other participants that someone is leaving
+	room.mu.Lock()
+	participantIDs := make([]string, 0, len(room.Participants))
+	for id, participant := range room.Participants {
+		if id != c.id {
+			participantIDs = append(participantIDs, id)
+
+			// If host is leaving, terminate call for everyone
+			if isHost {
+				terminatePayload := map[string]interface{}{
+					"message": "Host ended the call",
+					"call_id": payload.CallID,
+					"host_id": c.id,
+				}
+				b, _ := json.Marshal(terminatePayload)
+				util.SendEventToClient(participant, "call_terminated", b)
+			} else {
+				// Regular participant left
+				leftPayload := map[string]interface{}{
+					"message":        "participant left",
+					"call_id":        payload.CallID,
+					"participant_id": c.id,
+				}
+				b, _ := json.Marshal(leftPayload)
+				util.SendEventToClient(participant, "participant_left", b)
+			}
+		}
+	}
+	room.mu.Unlock()
+
 	// Cleanup from the room
 	m.RemoveClientFromRoom(c)
 	c.RoomID = "" // Clear the room assignment
 
-	log.Printf("participant %s left room %s", payload.ParticipantID, payload.CallID)
+	log.Printf("participant %s left room %s (was host: %v, notified: %v)",
+		payload.ParticipantID, payload.CallID, isHost, participantIDs)
+
 	util.SendEventToClient(c, "left_room", []byte(`{"message":"left room"}`))
 	return nil
 }
@@ -496,43 +531,52 @@ func (m *Manager) handleGetInitiator(c *Client, event Event) error {
 	room, ok := m.rooms[payload.CallID]
 	m.mu.Unlock()
 
-	var hostID string
-	var targetID string
-	if ok {
-		room.mu.Lock()
-		if len(room.ParticipantsList) > 0 {
-			hostID = room.ParticipantsList[len(room.ParticipantsList)-1]
-		} else {
-			hostID = room.HostID
-		}
-		targetID = room.ParticipantsList[0]
-		room.mu.Unlock()
-	} else {
-		// Fallback to DB if room not in memory
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-		defer cancel()
-
-		callUUID, err := uuid.Parse(payload.CallID)
-		if err != nil {
-			return err
-		}
-
-		hostUUID, err := m.queries.GetHostIDByCallID(ctx, callUUID)
-		if err != nil {
-			log.Printf("error getting host id from db: %v", err)
-			return err
-		}
-		hostID = hostUUID.String()
+	if !ok {
+		log.Printf("room not found for get_initiator: %v", payload.CallID)
+		util.SendEventToClient(c, "error", []byte(`{"message":"room not found"}`))
+		return nil
 	}
 
+	room.mu.Lock()
+	defer room.mu.Unlock()
+
+	// Build list of participants EXCEPT the requester
+	// The requester should connect to all existing participants
+	var existingParticipants []string
+	for _, participantID := range room.ParticipantsList {
+		if participantID != payload.ParticipantID {
+			existingParticipants = append(existingParticipants, participantID)
+		}
+	}
+
+	log.Printf("Get initiator for %s in room %s. Existing participants: %v",
+		payload.ParticipantID, payload.CallID, existingParticipants)
+
+	// If there are no other participants, wait
+	if len(existingParticipants) == 0 {
+		log.Printf("No other participants yet for %s", payload.ParticipantID)
+		resPayload := struct {
+			CallID               string   `json:"call_id"`
+			ExistingParticipants []string `json:"existing_participants"`
+		}{
+			CallID:               payload.CallID,
+			ExistingParticipants: []string{},
+		}
+		data, _ := json.Marshal(resPayload)
+		util.SendEventToClient(c, "initiator_res", data)
+		return nil
+	}
+
+	// Return the list of participants to connect to
+	// The requester should create offers to each of these
 	resPayload := struct {
-		HostID   string `json:"host_id"`
-		CallID   string `json:"call_id"`
-		TargetID string `json:"target_id"`
+		CallID               string   `json:"call_id"`
+		ExistingParticipants []string `json:"existing_participants"`
+		RequesterID          string   `json:"requester_id"`
 	}{
-		HostID:   hostID,
-		CallID:   payload.CallID,
-		TargetID: targetID,
+		CallID:               payload.CallID,
+		ExistingParticipants: existingParticipants,
+		RequesterID:          payload.ParticipantID,
 	}
 
 	data, err := json.Marshal(resPayload)

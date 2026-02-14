@@ -36,7 +36,8 @@ func (h *Handler) CreateCallLink(c *gin.Context) {
 		return
 	}
 
-	link := util.GenerateCallLink("jumbotronm", call.Title)
+	// Generate short call link (e.g., "vcme.com/join/aB3xK9Qm")
+	link := util.GenerateCallLink("vcme.com")
 
 	params := db.CreateCallLinkParams{
 		Title:       call.Title,
@@ -150,7 +151,6 @@ func (h *Handler) EndCall(c *gin.Context) {
 		return
 	}
 
-
 	c.JSON(http.StatusOK, gin.H{
 		"message": "call successfully ended",
 		"call":    endedCall,
@@ -172,7 +172,7 @@ func (h *Handler) GetCallLogsByUserID(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":  "call logs successfully retrieved",
+		"message":   "call logs successfully retrieved",
 		"call_logs": callLogs,
 	})
 }
