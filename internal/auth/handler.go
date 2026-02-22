@@ -94,3 +94,24 @@ func (h *Handler) LoginUser(c *gin.Context) {
 		"refreshToken": refreshToken,
 	})
 }
+
+func (h *Handler) Refresh(c *gin.Context) {
+	authHeader := c.GetHeader("Authorization")
+	tokenString, err := util.ExtractToken(authHeader)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+		return
+	}
+
+	newAccessToken, newRefreshToken, err := h.svc.Refresh(c.Request.Context(), tokenString)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not generate new tokens"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":      "tokens refreshed successfully",
+		"accessToken":  newAccessToken,
+		"refreshToken": newRefreshToken,
+	})
+}

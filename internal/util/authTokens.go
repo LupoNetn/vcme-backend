@@ -3,6 +3,7 @@ package util
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -66,4 +67,17 @@ func VerifyToken(tokenStr string, secret string) (*Claims, error) {
 	}
 
 	return claims, nil
+}
+
+// ExtractToken extracts the bearer token from the Authorization header.
+func ExtractToken(authHeader string) (string, error) {
+	if authHeader == "" {
+		return "", errors.New("authorization header is required")
+	}
+
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		return "", errors.New("authorization header must start with Bearer")
+	}
+
+	return strings.TrimPrefix(authHeader, "Bearer "), nil
 }

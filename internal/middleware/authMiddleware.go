@@ -3,11 +3,11 @@ package middleware
 import (
 	"errors"
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	jwt "github.com/golang-jwt/jwt/v4"
 	"github.com/luponetn/vcme/internal/config"
+	"github.com/luponetn/vcme/internal/util"
 )
 
 // Claims represents the JWT claims we expect in requests.
@@ -44,21 +44,14 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get token from Authorization header
 		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "authorization header is required"})
+		tokenString, err := util.ExtractToken(authHeader)
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 			c.Abort()
 			return
 		}
 
-		// Check if header starts with "Bearer "
-		if !strings.HasPrefix(authHeader, "Bearer ") {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "authorization header must start with Bearer"})
-			c.Abort()
-			return
-		}
-
-		// Extract token
-		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
+		// Validate token using local verifier
 
 		// Validate token using local verifier
 		claims, err := VerifyToken(tokenString, cfg.JWTAccessSecret)

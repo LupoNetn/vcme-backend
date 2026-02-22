@@ -69,7 +69,7 @@ func main() {
 	queries := db.New(app.db)
 
 	//setting up the services
-	authsvc := auth.NewSvc(queries)
+	authsvc := auth.NewSvc(queries, app.config)
 	authHandler := auth.NewHandler(authsvc, app.config)
 
 	callsvc := call.NewSvc(queries)
