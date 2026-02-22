@@ -24,3 +24,9 @@ type SignalPayload struct {
 	TargetID string          `json:"target_id"`
 	Data     json.RawMessage `json:"data"`
 }
+
+type SendEmojiPayload struct {
+	CallID        string `json:"call_id"`
+	ParticipantID string `json:"participant_id"`
+	Emoji         string `json:"emoji"`
+}

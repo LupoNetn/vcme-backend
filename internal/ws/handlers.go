@@ -3,6 +3,7 @@ package ws
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"time"
 
@@ -21,6 +22,7 @@ var (
 	EventTypeAcceptParticipant  = "accept_participant"
 	EventTypeDeclineParticipant = "decline_participant"
 	EventTypeGetInitiator       = "get_initiator"
+	EventTypeSendEmoji          = "send_emoji"
 )
 
 // handlers for the different event types
@@ -585,5 +587,26 @@ func (m *Manager) handleGetInitiator(c *Client, event Event) error {
 	}
 
 	util.SendEventToClient(c, "initiator_res", data)
+	return nil
+}
+
+func (m *Manager) handleSendEmoji(c *Client, event Event) error {
+	var payload SendEmojiPayload
+	if err := json.Unmarshal(event.Payload, &payload); err != nil {
+		log.Printf("invalid emoji payload: %v", err)
+		return err
+	}
+
+	m.mu.Lock()
+	room, ok := m.rooms[payload.CallID]
+	m.mu.Unlock()
+
+	if !ok {
+		return fmt.Errorf("room not found: %s", payload.CallID)
+	}
+
+	// Broadcast the emoji to everyone in the room
+	room.Broadcast("emoji_received", event.Payload, nil)
+
 	return nil
 }
