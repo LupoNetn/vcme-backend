@@ -82,6 +82,7 @@ func (m *Manager) handleJoinRoom(c *Client, event Event) error {
 		if !ok {
 
 			util.SendEventToClient(c, "error", []byte(`{"message":"host not yet connected"}`))
+			c.RoomID = ""
 			return nil
 		}
 		room.mu.Lock()

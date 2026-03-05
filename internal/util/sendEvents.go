@@ -5,7 +5,7 @@ import (
 	"log"
 )
 
-func SendEventToClient(c interface{}, eventType string, payload json.RawMessage) {
+func SendEventToClient(c any, eventType string, payload json.RawMessage) {
 	event := struct {
 		EventType string
 		Payload   json.RawMessage

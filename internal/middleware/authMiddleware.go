@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -17,28 +16,6 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-// VerifyToken parses and validates the JWT using the provided secret.
-func VerifyToken(tokenString, secret string) (*Claims, error) {
-	if tokenString == "" {
-		return nil, errors.New("empty token")
-	}
-	parsed, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
-		// Ensure signing method is HMAC
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errors.New("unexpected signing method")
-		}
-		return []byte(secret), nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	claims, ok := parsed.Claims.(*Claims)
-	if !ok || !parsed.Valid {
-		return nil, errors.New("invalid token claims")
-	}
-	return claims, nil
-}
-
 // AuthMiddleware checks for a valid JWT token in the Authorization header
 func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -52,9 +29,7 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 		}
 
 		// Validate token using local verifier
-
-		// Validate token using local verifier
-		claims, err := VerifyToken(tokenString, cfg.JWTAccessSecret)
+		claims, err := util.VerifyToken(tokenString, cfg.JWTAccessSecret)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
 			c.Abort()
@@ -76,5 +51,9 @@ func GetCurrentUser(c *gin.Context) (*Claims, bool) {
 	}
 
 	claims, ok := val.(*Claims)
+	//incase error handling
+	if !ok {
+		return nil, false
+	}
 	return claims, ok
 }

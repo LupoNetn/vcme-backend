@@ -10,7 +10,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/luponetn/vcme/internal/config"
 	"github.com/luponetn/vcme/internal/db"
-	"github.com/luponetn/vcme/internal/middleware"
+	"github.com/luponetn/vcme/internal/util"
 )
 
 var (
@@ -63,7 +63,7 @@ func (m *Manager) ServeWS(c *gin.Context) {
 		return
 	}
 
-	claims, err := middleware.VerifyToken(token, m.cfg.JWTAccessSecret)
+	claims, err := util.VerifyToken(token, m.cfg.JWTAccessSecret)
 	if err != nil {
 		log.Printf("invalid token: %v", err)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
@@ -71,6 +71,9 @@ func (m *Manager) ServeWS(c *gin.Context) {
 	}
 
 	clientIDStr := claims.UserID
+	/*
+	 TODO: Convert clientIDStr from uuid.UUID -> string
+	*/
 
 	//upgrade http connection to websocket
 	conn, err := websocketUpgrader.Upgrade(c.Writer, c.Request, nil)
@@ -79,10 +82,10 @@ func (m *Manager) ServeWS(c *gin.Context) {
 		return
 	}
 
-	client := NewClient(clientIDStr, conn, m)
-	m.AddClient(client, clientIDStr)
+	client := NewClient(clientIDStr.String(), conn, m)
+	m.AddClient(client, clientIDStr.String())
 
-	//start listening for processes from the clients
+	//start listening for processes from other clients
 	go client.Listen()
 	go client.Send()
 }

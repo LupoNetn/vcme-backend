@@ -24,7 +24,7 @@ func NewSvc(queries *db.Queries, config *config.Config) Service {
 	return &Svc{queries: queries, config: config}
 }
 
-// functions implementationss
+// interface function implementationss
 func (s *Svc) CreateUser(ctx context.Context, arg db.CreateUserParams) (db.User, error) {
 	return s.queries.CreateUser(ctx, arg)
 }

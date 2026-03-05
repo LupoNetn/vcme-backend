@@ -67,7 +67,7 @@ func (h *Handler) LoginUser(c *gin.Context) {
 
 	user, err := h.svc.LoginUser(c.Request.Context(), req.Email, req.Password)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid email or password"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": err})
 		return
 	}
 

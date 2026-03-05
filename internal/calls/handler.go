@@ -111,17 +111,7 @@ func (h *Handler) GetCallByLink(c *gin.Context) {
 }
 
 func (h *Handler) EndCall(c *gin.Context) {
-	type endCallParams struct {
-		UserID           uuid.UUID   `json:"user_id"`
-		CallID           uuid.UUID   `json:"call_id"`
-		Participant      pgtype.Text `json:"participant"`
-		Type             pgtype.Text `json:"type"`
-		Time             pgtype.Text `json:"time"`
-		CallTitle        pgtype.Text `json:"call_title"`
-		Duration         string      `json:"duration"`
-		ParticipantCount int32       `json:"participant_count"`
-	}
-	var endCall endCallParams
+	var endCall EndCallParams
 	log.Printf("user foreign id = %v", endCall.UserID)
 	if err := c.ShouldBindJSON(&endCall); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
