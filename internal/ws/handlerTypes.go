@@ -30,3 +30,9 @@ type SendEmojiPayload struct {
 	ParticipantID string `json:"participant_id"`
 	Emoji         string `json:"emoji"`
 }
+
+type SendChatMessagePayload struct {
+	CallID        string `json:"call_id"`
+	ParticipantID string `json:"participant_id"`
+	Message       string `json:"message"`
+}

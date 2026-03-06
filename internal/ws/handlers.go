@@ -23,6 +23,7 @@ var (
 	EventTypeDeclineParticipant = "decline_participant"
 	EventTypeGetInitiator       = "get_initiator"
 	EventTypeSendEmoji          = "send_emoji"
+	EventTypeSendChatMessage    = "send_chat_message"
 )
 
 // handlers for the different event types
@@ -609,5 +610,66 @@ func (m *Manager) handleSendEmoji(c *Client, event Event) error {
 	// Broadcast the emoji to everyone in the room
 	room.Broadcast("emoji_received", event.Payload, nil)
 
+	return nil
+}
+
+func (m *Manager) handleSendChatMessage(c *Client, event Event) error {
+	var payload SendChatMessagePayload
+	if err := json.Unmarshal(event.Payload, &payload); err != nil {
+		log.Printf("invalid chat message payload: %v", err)
+		return err
+	}
+
+	if payload.Message == "" {
+		return nil
+	}
+
+	m.mu.Lock()
+	room, ok := m.rooms[payload.CallID]
+	m.mu.Unlock()
+
+	if !ok {
+		util.SendEventToClient(c, "error", []byte(`{"message":"room not found"}`))
+		return nil
+	}
+
+	// Look up the sender's display name
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	senderName := "Anonymous"
+	senderUUID, err := uuid.Parse(c.id)
+	if err == nil {
+		user, err := m.queries.GetUserById(ctx, senderUUID)
+		if err == nil {
+			senderName = user.Name
+		}
+	}
+
+	// Build the broadcast payload
+	outPayload := struct {
+		CallID     string `json:"call_id"`
+		SenderID   string `json:"sender_id"`
+		SenderName string `json:"sender_name"`
+		Message    string `json:"message"`
+		SentAt     string `json:"sent_at"`
+	}{
+		CallID:     payload.CallID,
+		SenderID:   c.id,
+		SenderName: senderName,
+		Message:    payload.Message,
+		SentAt:     time.Now().Format("15:04"),
+	}
+
+	b, err := json.Marshal(outPayload)
+	if err != nil {
+		log.Printf("error marshaling chat message: %v", err)
+		return err
+	}
+
+	// Broadcast to ALL participants (including sender — they see their own message)
+	room.Broadcast("chat_message_received", b, nil)
+
+	log.Printf("chat message from %s (%s) in room %s", senderName, c.id, payload.CallID)
 	return nil
 }

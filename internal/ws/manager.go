@@ -101,6 +101,7 @@ func (m *Manager) RegisterEventHandler() {
 	m.handlers[EventTypeDeclineParticipant] = m.handleDeclineParticipant
 	m.handlers[EventTypeGetInitiator] = m.handleGetInitiator
 	m.handlers[EventTypeSendEmoji] = m.handleSendEmoji
+	m.handlers[EventTypeSendChatMessage] = m.handleSendChatMessage
 }
 
 // send event to the manager for routing
