@@ -79,9 +79,11 @@ func (m *Manager) handleJoinRoom(c *Client, event Event) error {
 			util.SendEventToClient(c, "host_joined_room", data)
 		}
 	} else {
+		m.mu.Lock()
 		room, ok := m.rooms[payload.CallID]
-		if !ok {
+		m.mu.Unlock()
 
+		if !ok {
 			util.SendEventToClient(c, "error", []byte(`{"message":"host not yet connected"}`))
 			c.RoomID = ""
 			return nil
@@ -140,8 +142,10 @@ func (m *Manager) handleAcceptParticipant(c *Client, event Event) error {
 		log.Printf("invalid accept participant payload: %v", err)
 		return err
 	}
-
+	m.mu.Lock()
 	room, ok := m.rooms[payload.CallID]
+	m.mu.Unlock()
+
 	if !ok {
 		util.SendEventToClient(c, "error", []byte(`{"message":"room not found"}`))
 		return nil
@@ -267,8 +271,10 @@ func (m *Manager) handleDeclineParticipant(c *Client, event Event) error {
 		log.Printf("invalid decline participant payload: %v", err)
 		return err
 	}
-
+	m.mu.Lock()
 	room, ok := m.rooms[payload.CallID]
+	m.mu.Unlock()
+
 	if !ok {
 		util.SendEventToClient(c, "error", []byte(`{"message":"room not found"}`))
 		return nil
@@ -301,8 +307,10 @@ func (m *Manager) handleLeaveRoom(c *Client, event Event) error {
 		log.Printf("invalid leave room payload: %v", err)
 		return err
 	}
-
+	m.mu.Lock()
 	room, ok := m.rooms[payload.CallID]
+	m.mu.Unlock()
+
 	if !ok {
 		util.SendEventToClient(c, "error", []byte(`{"message":"room not found"}`))
 		return nil
@@ -359,7 +367,10 @@ func (m *Manager) handleOffer(c *Client, event Event) error {
 		return err
 	}
 
+	m.mu.Lock()
 	room, ok := m.rooms[offerPayload.CallID]
+	m.mu.Unlock()
+
 	if !ok {
 		log.Printf("room not found for call id: %v", offerPayload.CallID)
 		util.SendEventToClient(c, "error", []byte(`{"message":"room not found"}`))
@@ -415,7 +426,10 @@ func (m *Manager) handleAnswer(c *Client, event Event) error {
 		return err
 	}
 
+	m.mu.Lock()
 	room, ok := m.rooms[answerPayload.CallID]
+	m.mu.Unlock()
+
 	if !ok {
 		log.Printf("room not found for call id: %v", answerPayload.CallID)
 		util.SendEventToClient(c, "error", []byte(`{"message":"room not found"}`))
@@ -471,7 +485,10 @@ func (m *Manager) handleICECandidate(c *Client, event Event) error {
 		return err
 	}
 
+	m.mu.Lock()
 	room, ok := m.rooms[icePayload.CallID]
+	m.mu.Unlock()
+
 	if !ok {
 		log.Printf("room not found for call id: %v", icePayload.CallID)
 		util.SendEventToClient(c, "error", []byte(`{"message":"room not found"}`))
